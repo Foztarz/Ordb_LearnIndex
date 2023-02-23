@@ -35,7 +35,7 @@
 n_iter = 1e3 # number of modelling iterations to run, 1e2 is faster, 1e4 is more accurate
 n_pred = 2e1 # number of predictions levels to run, 5e0 is faster, 2e1 is smoother
 use_mice = FALSE # use functions for multiple imputation (now done manually)
-use_best = FALSE # Inspect the best model. If FALSE, the user will be asked which model
+use_best = TRUE # Inspect the best model. If FALSE, the user will be asked which model
 
 #load packages
 require(cmdstanr)#most efficient connection to Stan sampler
