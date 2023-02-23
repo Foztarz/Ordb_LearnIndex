@@ -31,7 +31,8 @@
 #- Model comparison across any model list +
 #- Reduce memory usage for parallel processing  +
 #- Exclude unused modelling functions +
-#- Troubleshoot pp_check_ordbeta
+#- Troubleshoot pp_check_ordbeta  +
+#- Try recommended LOO averaging https://discourse.mc-stan.org/t/how-would-loo-with-multiple-imputations-look-like/11998
 
 # Starting parameters -----------------------------------------------------
 n_iter = 1e3 # number of modelling iterations to run, 1e2 is faster, 1e4 is more accurate
@@ -172,10 +173,14 @@ path_file = tryCatch(expr = file.path(dirname(sys.frame(1)$ofile), "dataR2.csv")
 if(!file.exists(path_file))
 {path_file = FT_select_file(file_type = 'dataR2.csv')}
 #TODO check if this is used
-df = read.table(file = path_file,
-                sep = ',', # ',' for '0.0' decimals csv, ';' for '0,0' 
-                header = TRUE
-)
+    # df = read.table(file = path_file,
+    #                 sep = ',', # ',' for '0.0' decimals csv, ';' for '0,0' 
+    #                 header = TRUE
+    # )
+## View(df) # hopefully we have loaded the correct dataset
+#convert from learning index to proportion correct
+    # df = within(df, {perc_corr = (LI + 1)/2})
+    # df = within(df, {Treatment = as.factor(Treatment)})
 #find imputed data
 if(file.exists(paste0(path_file, '_man_imputed.Rdata')))
 {
@@ -189,17 +194,24 @@ if(file.exists(paste0(path_file, '_man_imputed.Rdata')))
 imp_data = get(imp_load)#ensure consistent naming
 rm(imp_load)#original named variable no longer needed, remove
 
-## View(df) # hopefully we have loaded the correct dataset
-#convert from learning index to proportion correct
-df = within(df, {perc_corr = (LI + 1)/2})
-df = within(df, {Treatment = as.factor(Treatment)})
 
 # Select and load all models  -------------------------------------------
-path_mod = FT_select_file(file_type = "_allmodels.Rdata")
-
+path_mod = list.files(path = dirname(path_file),
+                      pattern = "_allmodels.Rdata",
+                      full.names = TRUE
+                      )
+if(length(path_mod))
+{
+  path_mod = path_mod[[1]]
+  message('...loading:\n',path_mod)
+}else
+{
+  path_mod = FT_select_file(file_type = "_allmodels.Rdata")
+}
 nload = load(file = path_mod)#N.B. nload will be a list of names of loaded variables
-
 model_listlist = get(nload)#ensure consistent naming
+rm(nload)#remove doubled object
+
 #this is a list of models,
 #each element of which contains a list of models with the same formula,
 #fitted to different imputed datasets
@@ -236,7 +248,7 @@ comb_listlist = lapply(X = model_listlist,
 if(pp_plots) # In CRAN version make sure to set 'reverse_bounds' to FALSE
 {
   #open a file to save in
-  pdf_file = file.path(dirname(path_file), paste0(nload, '_pp_checks.pdf'))
+  pdf_file = file.path(dirname(path_file), paste0(basename(path_mod), '_pp_checks.pdf'))
   pdf(file = pdf_file)#open a PDF file
   #plot subsample of predictions for each model
   for(i in 1:length(comb_listlist))
@@ -292,7 +304,7 @@ system.time(
 if(save_loo)
 {
   #TODO allow loading of previously generated test
-  save(lop_test,file = dirname(path_file), paste0(nload, 'LOO_test.Rdata'))
+  save(lop_test,file = dirname(path_file), paste0(basename(path_mod), 'LOO_test.Rdata'))
 }
 
 print(loo_compare(x = lop_test))
@@ -343,7 +355,7 @@ system.time({
 if(save_loo)
 {
   #TODO allow loading of previously generated list of LOO model validations
-  save(loom_all,file = dirname(path_file), paste0(nload, 'LOO_m_all.Rdata'))
+  save(loom_all,file = dirname(path_file), paste0(basename(path_mod), 'LOO_m_all.Rdata'))
 }
 #for quick comparison, take the median values across imputed datasets
 #should be very fast
@@ -441,7 +453,7 @@ summary(best_model)
 
 #save each of these with a recognisible name
 save(best_model,
-     file = file.path(dirname(path_mod), 'best_model.RData') )
+     file = file.path(dirname(path_mod), 'best_model.Rdata') )
 save(best_model_list,
-     file = file.path(dirname(path_mod), 'best_model_list.RData') )
+     file = file.path(dirname(path_mod), 'best_model_list.Rdata') )
                  
