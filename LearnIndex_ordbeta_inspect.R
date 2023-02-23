@@ -1,6 +1,6 @@
 # Details ---------------------------------------------------------------
 #       AUTHOR:	James Foster              DATE: 2023 02 01
-#     MODIFIED:	James Foster              DATE: 2023 02 22
+#     MODIFIED:	James Foster              DATE: 2023 02 23
 #
 #  DESCRIPTION: Loads a previously fitted ordbetareg model and the associated
 #               data and functions for inspection
@@ -28,6 +28,7 @@
 #- Check compatibility with manual imputation +
 #- Check compatibility with ordbetareg v. 0.7.0 (20230212)  +
 #- Load from model list list (i.e. not the best model)  +
+#- Clean up test statistic calculation (very messy)
 #- Account for predictions from mean only models
 
 # Starting parameters -----------------------------------------------------
@@ -387,16 +388,17 @@ invisible(
 if(!is.null(ordb_cond$`Dspeed:Treatment`))
 {
 pred_data = ordb_cond$`Dspeed:Treatment`
-
+#save as a PDF
 pdf_file = file.path(dirname(path_mod), 
                      paste0(
                        if(use_best){basename(path_mod)}else
                                    {found_name},
                        '__results_Dspeed_Treatment.pdf'))
-pdf(file = pdf_file)
+pdf(file = pdf_file)#open a PDF
+#plot each treatment
 with(subset(df, Treatment == 1), plot(x = Dspeed, y = LI, pch = 20, col = 'darkblue', xlab = 'Dspeed', ylab = 'learning index'))
 with(subset(df, Treatment == 2), points(x = Dspeed, y = LI, pch = 20, col = adjustcolor('orange', alpha = 0.5)) )
-
+#add maximum, minimum and no-learning lines
 abline(h = c(-1,0,1))
 
 #plot total prediction intervals
@@ -424,6 +426,7 @@ with(subset(pred_data, Treatment == 1),
        )
      }
 )
+#plot the median prediction lines
 with(subset(pred_data, Treatment == 1), 
      lines(x = sort(Dspeed), y = estimate__[order(Dspeed)]*2-1, 
            col = 'darkblue',
@@ -434,6 +437,7 @@ with(subset(pred_data, Treatment == 2),
            col = 'orange',
            lwd = 5)
 )
+#overplot raw data for comparison
 with(subset(df, Treatment == 1), 
      points(x = Dspeed, y = LI, 
             pch = 21, lwd = 2,
@@ -448,7 +452,7 @@ with(subset(df, Treatment == 2),
             bg = adjustcolor('white', alpha.f = 0.8) 
      ) 
 )
-
+#close the PDF to save
 dev.off()
 shell.exec.OS(pdf_file)
 }
@@ -457,17 +461,18 @@ shell.exec.OS(pdf_file)
 if(!is.null(ordb_cond$`Age:Treatment`))
 {
 pred_data = ordb_cond$`Age:Treatment`
-
 pdf_file = file.path(dirname(path_file), 
                      paste0(
                        if(use_best){basename(path_mod)}else
                                     {found_name}, 
                             '__results_Age_Treatment.pdf')
                      )
+#open a PDF file
 pdf(file = pdf_file)
+#plot the data for each treatment
 with(subset(df, Treatment == 1), plot(x = Age, y = LI, pch = 20, col = 'darkblue', xlab = 'Age', ylab = 'learning index'))
 with(subset(df, Treatment == 2), points(x = Age, y = LI, pch = 20, col = adjustcolor('orange', alpha = 0.5)) )
-
+#add maximum, minimum and no-learning lines
 abline(h = c(-1,0,1))
 
 #plot total prediction intervals
@@ -495,6 +500,7 @@ with(subset(pred_data, Treatment == 1),
        )
      }
 )
+#add median lines of prediction
 with(subset(pred_data, Treatment == 1), 
      lines(x = sort(Age), y = estimate__[order(Age)]*2-1, 
            col = 'darkblue',
@@ -505,6 +511,7 @@ with(subset(pred_data, Treatment == 2),
            col = 'orange',
            lwd = 5)
 )
+#overplot raw data for comparison
 with(subset(df, Treatment == 1), 
      points(x = Age, y = LI, 
             pch = 21, lwd = 2,
@@ -519,7 +526,7 @@ with(subset(df, Treatment == 2),
             bg = adjustcolor('white', alpha.f = 0.8) 
      ) 
 )
-
+#close PDF to save
 dev.off()
 shell.exec.OS(pdf_file)
 }
