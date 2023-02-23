@@ -113,19 +113,13 @@ require(ordbetareg)#load the package N.B. for latest version remotes::install_gi
 #N.B. as of 20230215 the posterior_epred_ord_beta_reg function works as expected
 #try to find modelling.R without asking the user
 #guess local directory
-local_path = tryCatch(expr = {file.path(dirname(sys.frame(1)$ofile))}, # directory containing this script
+path_R = tryCatch(expr = {file.path(dirname(sys.frame(1)$ofile), 'modeling.R')}, # directory containing this script
                      error = function(e)
                              {#if that fails, try to find the "Documents" folder
-                             file.path(
-                                 if(Sys.info()[['sysname']] == 'Windows')
-                                   {gsub('\\\\', '/', Sys.getenv('USERPROFILE'))}else
-                                   {Sys.getenv('HOME')},
-                               'Documents'
-                               )
+                             file.path(getwd(), 'modeling.R')
                                }
                         )
 #guess modeling.R is in that directory
-path_R = file.path(local_path, 'modeling.R')
 if(file.exists(path_R))
 {
   message('...loading:\n',path_R)
