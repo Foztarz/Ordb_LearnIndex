@@ -59,40 +59,34 @@ These are saved in a ```.csv``` file ("[model_name]__results.csv").
 
 # File manifest
 
-
-**- [Install_ordbetareg.R](Install_ordbetareg.R)**
+#### **- [Install_ordbetareg.R](Install_ordbetareg.R)**
 
 Setup instructions for fitting ordered beta regression in the [Stan](https://mc-stan.org/) Bayesian statistical modelling language.
 
 
-
-**- [LearnIndex_ordbeta_manual__impute.R](LearnIndex_ordbeta_manual__impute.R)**
+#### **- [LearnIndex_ordbeta_manual__impute.R](LearnIndex_ordbeta_manual__impute.R)**
 
 Impute missing data, and fit and save ordered beta regression models across all model formulas and imputed datasets.
 
 
-
-**- [LearnIndex_ordbeta_multimodel_compare.R](LearnIndex_ordbeta_multimodel_compare.R)**
+#### **- [LearnIndex_ordbeta_multimodel_compare.R](LearnIndex_ordbeta_multimodel_compare.R)**
 
 Compare the fitted models using [leave-one-out cross-validation](https://mc-stan.org/loo/) 
 and save the model with the best predictive performance.
 
 
-
-**- [LearnIndex_ordbeta_inspect.R](LearnIndex_ordbeta_inspect.R)**
+#### **- [LearnIndex_ordbeta_inspect.R](LearnIndex_ordbeta_inspect.R)**
 
 Inspect the model fit and save predicted effects and plots of predictions alongside the original data.
 
 
-
-**- [modeling.R](modeling.R)**
+#### **- [modeling.R](modeling.R)**
 
 A set of functions for fitting ordered beta regression models using ```brms::brm_multiple()``` rather than ```ordbetareg::ordbetareg()```. 
 Taken from [```ordbetareg_pack```](https://github.com/saudiwin/ordbetareg_pack/blob/master/R/modeling.R) (author [Robert Kubinec](https://github.com/saudiwin)).
 
 
-
-**- [Spearman_plot.R](Spearman_plot.R)**
+#### **- [Spearman_plot.R](Spearman_plot.R)**
 
 An example method for plotting the Spearman correlation equivalent of a regression line. 
 _N.B._ Results follow the intuitive predictions of the correlation, 
@@ -100,8 +94,7 @@ but the simulation shows they are a poor reflection of the process that generate
 (at least where multiple data-points have the same value).
 
 
-
-**- [dataR2.csv](dataR2.csv)**
+#### **- [dataR2.csv](dataR2.csv)**
 
 A comma separated spreadsheet containing the raw data, with headers:
 
