@@ -1,6 +1,6 @@
 # Ordb_LearnIndex
 A set of R scripts for fitting [Ordered Beta Regression](https://doi.org/10.1017/pan.2022.20) models
-to learning index data from bumblebees in an automated [Y-maze](https://doi.org/10.3389/fphys.2019.00678), 
+to learning index data from bumblebees in an [automated Y-maze](https://doi.org/10.3389/fphys.2019.00678), 
 to assess the effects of glyphosate treatment on learning.
 
 # Usage
