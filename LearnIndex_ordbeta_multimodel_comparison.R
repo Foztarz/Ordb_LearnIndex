@@ -30,7 +30,7 @@
 #- Combine all models +
 #- Model comparison across any model list +
 #- Reduce memory usage for parallel processing  +
-#- Exclude unused modelling functions
+#- Exclude unused modelling functions +
 #- Troubleshoot pp_check_ordbeta
 
 # Starting parameters -----------------------------------------------------
@@ -161,32 +161,6 @@ AggList =  function(lst, fn = median, ...)
 }
 
 
-# Set up ordbetareg custom family -----------------------------------------
-#TODO check if this is necessary after CRAN install
-    # # code taken from:
-    # # https://github.com/saudiwin/ordbetareg_pack/blob/master/R/modeling.R
-    # #guess file location in current folder (or working directory when running interactive session)
-    # path_R = tryCatch(expr = file.path(dirname(sys.frame(1)$ofile), "modeling_JJF.R"),
-    #                   error = function(e)
-    #                   {
-    #                     file.path(getwd(),"modeling_JJF.R")
-    #                   }
-    # )
-    # #if not found there ask user
-    # if(!file.exists(path_R))
-    # {path_R = FT_select_file(file_type = "modeling_JJF.R")}
-    # #run and load the custom family definition
-    # source(path_R)#N.B. relies on functions loaded from BRMS
-    # 
-    # ordbeta_params = .load_ordbetareg() # load and store features of the ordbetareg family
-# custom family
-## ord_beta_reg <- custom_family("ord_beta_reg",
-##                               dpars=c("mu","phi","cutzero","cutone"),
-##                               links=c("logit","log",NA,NA),
-##                               lb=c(NA,0,NA,NA),
-##                               type="real")
-
-
 # Select and load dataset of interest -------------------------------------
 #guess data location in current folder (or working directory when running interactive session)
 path_file = tryCatch(expr = file.path(dirname(sys.frame(1)$ofile), "dataR2.csv"),
@@ -263,23 +237,26 @@ if(pp_plots) # In CRAN version make sure to set 'reverse_bounds' to FALSE
 {
   #open a file to save in
   pdf_file = file.path(dirname(path_file), paste0(nload, '_pp_checks.pdf'))
-  pdf(file = pdf_file)
+  pdf(file = pdf_file)#open a PDF file
   #plot subsample of predictions for each model
   for(i in 1:length(comb_listlist))
   {
+    #use the ordbetareg function for plotting posterior predictive checks
     plt_tmp = ordbetareg::pp_check_ordbeta(comb_listlist[[i]], 
                                        ndraws = 100, reverse_bounds = FALSE)
+    #plot the proportions of discrete and condituous data with the model details
     plot(plt_tmp$discrete + 
-      ggtitle(label = names(comb_listlist)[i],
-      subtitle = formula(comb_listlist[[i]]))
+      ggtitle(label = names(comb_listlist)[i], # model name as title
+      subtitle = formula(comb_listlist[[i]])) # model formula as subtitle
     )
+    #plot the contiuous component of the data and predictions
     plot(plt_tmp$continuous+ 
       ggtitle(label = names(comb_listlist)[i],
               subtitle = formula(comb_listlist[[i]]))
     )
   }
-  dev.off()
-  shell.exec.OS(pdf_file)
+  dev.off() # close the PDF file to save
+  shell.exec.OS(pdf_file) # view the saved PDF file
 }
 
 
@@ -287,6 +264,7 @@ if(pp_plots) # In CRAN version make sure to set 'reverse_bounds' to FALSE
 
 
 # . Set up parallel cluster -----------------------------------------------
+#this will require a lot of processing that can be sped up using multiple CPUs
 clt = parallel::makeCluster(n_cores-2, # the multithreading uses up a a lot of CPU!
                             type = 'PSOCK')
 #export Bayesian modelling functions to the parallel cluster
@@ -295,6 +273,7 @@ invisible({parallel::clusterEvalQ(cl = clt, expr = {library("brms")})})
 
 # . Test pointwise LOO with one dataset -----------------------------------
 
+#single (imputed) dataset estimates give a good approximation of the full combined model
 #takes almost 10 minutes
 system.time(
   {
@@ -312,6 +291,7 @@ system.time(
 ## 0.97    0.86  409.52 #mostly overhead from importing and exporting to cluster
 if(save_loo)
 {
+  #TODO allow loading of previously generated test
   save(lop_test,file = dirname(path_file), paste0(nload, 'LOO_test.Rdata'))
 }
 
@@ -362,6 +342,7 @@ system.time({
 # 1.04    0.78  646.40 
 if(save_loo)
 {
+  #TODO allow loading of previously generated list of LOO model validations
   save(loom_all,file = dirname(path_file), paste0(nload, 'LOO_m_all.Rdata'))
 }
 #for quick comparison, take the median values across imputed datasets
