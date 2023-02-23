@@ -6,7 +6,7 @@
 #               functions. The models are then compared using leave-one-out
 #               cross validation. Estimates are averaged across imputed datasets.
 #               
-#       INPUTS: A folder containing the original data, modeling_JJF.R and
+#       INPUTS: A folder containing the original data and
 #               output from LearnIndex_ordbeta_multimodel.R.
 #               
 #      OUTPUTS: Best models chosen and the list of imputed models with that formula

@@ -113,15 +113,6 @@ AggList =  function(lst, fn = median, ...)
   return(ap)
 }
 
-# Set up ordbetareg custom family -----------------------------------------
-# code taken from:
-# https://github.com/saudiwin/ordbetareg_pack/blob/master/R/modeling.R
-
-#TODO check this is necessary
-path_R = FT_select_file(file_type = "modeling.R")
-#run and load the custom family definition
-source(path_R)#N.B. relies on functions loaded from BRMS
-ordbeta_params = .load_ordbetareg(phi_reg = 'both') # add the functions to this object
 
 # Select and load dataset of interest -------------------------------------
 path_file = FT_select_file(file_type = 'dataR2.csv')

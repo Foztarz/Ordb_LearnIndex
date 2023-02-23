@@ -34,7 +34,7 @@
 #- Save brms models with "file = " argument +
 #- Fit null model +
 #- Manual imputation  +
-#- Model with effects of age and treatment only
+#- Model with effects of age and treatment only +
 
 # Starting parameters -----------------------------------------------------
 n_iter = 1e3 # number of modelling iterations to run, 1e2 is faster, 1e3 is more accurate
@@ -111,7 +111,28 @@ require(ordbetareg)#load the package N.B. for latest version remotes::install_gi
 # https://github.com/saudiwin/ordbetareg_pack/blob/master/R/modeling.R
 
 #N.B. as of 20230215 the posterior_epred_ord_beta_reg function works as expected
-path_R = FT_select_file(file_type = "modeling.R")
+#try to find modelling.R without asking the user
+#guess local directory
+local_path = tryCatch(expr = {file.path(dirname(sys.frame(1)$ofile))}, # directory containing this script
+                     error = function(e)
+                             {#if that fails, try to find the "Documents" folder
+                             file.path(
+                                 if(Sys.info()[['sysname']] == 'Windows')
+                                   {gsub('\\\\', '/', Sys.getenv('USERPROFILE'))}else
+                                   {Sys.getenv('HOME')},
+                               'Documents'
+                               )
+                               }
+                        )
+#guess modeling.R is in that directory
+path_R = file.path(local_path, 'modeling.R')
+if(file.exists(path_R))
+{
+  message('...loading:\n',path_R)
+}else
+{
+  path_R = FT_select_file(file_type = "modeling.R")
+}
 #run and load the custom family definition
 source(path_R)#N.B. relies on functions loaded from BRMS
 
@@ -356,7 +377,7 @@ clt = parallel::makeCluster( if(spare_cpu){floor(n_cores/n_chains)}else{n_cores-
 # takes <5 seconds
 invisible({parallel::clusterEvalQ(cl = clt, expr = {library("brms")})})
 
-# . Fit maximal model -----------------------------------------------------
+# . Fit all models -----------------------------------------------------
 #Beware, this may use nearly all CPU (memory load currently well managed)
 #this could take 4 h!
 system.time({
