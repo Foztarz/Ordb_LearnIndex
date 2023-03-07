@@ -1,6 +1,6 @@
 # Details ---------------------------------------------------------------
 #       AUTHOR:	James Foster              DATE: 2023 02 10
-#     MODIFIED:	James Foster              DATE: 2023 02 15
+#     MODIFIED:	James Foster              DATE: 2023 03 07
 #
 #  DESCRIPTION: Loads a set of ordbetareg models and the associated data and
 #               functions. The models are then compared using leave-one-out
@@ -12,6 +12,8 @@
 #      OUTPUTS: Best models chosen and the list of imputed models with that formula
 #
 #	   CHANGES: - save multimodel loo
+#             - load multimodel loo
+#             - specific comparisons
 #
 #   REFERENCES: Kubinec, R. (2022). 
 #               Ordered Beta Regression: A Parsimonious, Well-Fitting Model for 
