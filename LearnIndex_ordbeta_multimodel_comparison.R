@@ -41,7 +41,9 @@ n_cores = parallel::detectCores()-1 # number of CPUs to use, leave one for other
 n_chains =  min(parallel::detectCores()-1, 4) # number of chains to run, 4 is usually sufficient
 pp_plots = FALSE # plot and show prior predictive distribution for all models
 use_mice = FALSE # use functions for multiple imputation (now done manually)
-save_loo = TRUE # save calculated LOO for each model (may overwrite previous saved LOO)
+load_loo = TRUE # load calculated LOO for each model previously
+save_loo = # save calculated LOO for each model (may overwrite previous saved LOO)
+  if(!load_loo){TRUE}else{FALSE} #to avoid overwriting, only save if not loading
 
 # . Load packages ---------------------------------------------------------
 require(cmdstanr)#most efficient connection to Stan sampler
@@ -287,24 +289,41 @@ invisible({parallel::clusterEvalQ(cl = clt, expr = {library("brms")})})
 
 #single (imputed) dataset estimates give a good approximation of the full combined model
 #takes almost 10 minutes
-system.time(
-  {
-    lop_test = parallel::parLapply(cl = clt,
-                         X = comb_listlist,
-                      fun = brms::loo,
-                     newdata =  switch(EXPR = class(imp_data), 
-                                       mids = complete(imp_data, action = 1), 
-                                       list = imp_data[[1]]), # first imputed dataset
-                     pointwise = TRUE
-                    )
-  }
-)
+if(load_loo)
+  { 
+#if requested, load a previously-fitted version
+  lop_path = file.path(dirname(path_file), paste0(basename(path_mod), 'LOO_test.Rdata'))  
+   if( file.exists(lop_path) ) 
+     {  load(file = lop_path ) 
+     }else
+     {message( '\n', # if loading was requested and failed, inform the user
+            lop_path,
+            '\n not found. Recalculating loo.')}
+}
+if(!load_loo | !file.exists(lop_path) ) # only re-run if load not requested or possible
+{
+  #run loo in parallel on the 1st imputed dataset
+    system.time(
+      {
+        lop_test = parallel::parLapply(cl = clt,
+                             X = comb_listlist,
+                          fun = brms::loo,
+                         newdata =  switch(EXPR = class(imp_data), 
+                                           mids = complete(imp_data, action = 1), 
+                                           list = imp_data[[1]]), # first imputed dataset
+                         pointwise = TRUE
+                        )
+    }
+    )
 ## user  system elapsed 
 ## 0.97    0.86  409.52 #mostly overhead from importing and exporting to cluster
+}
+
 if(save_loo)
 {
   #TODO allow loading of previously generated test
-  save(lop_test,file = dirname(path_file), paste0(basename(path_mod), 'LOO_test.Rdata'))
+  save(lop_test,
+       file = file.path( dirname(path_mod), paste0(basename(path_mod), 'LOO_test.Rdata')) )
 }
 
 print(loo_compare(x = lop_test))
@@ -343,19 +362,33 @@ if(use_mice)
 
 #apply Leave-One-Out validation to all models for all imputed datasets
 #could take up to 15 minutes for 7 models
-system.time({
-    loom_all = parallel::parLapply(cl = clt,
-                         X = model_listlist,
-                         fun = Limp,
-                         impdata = imp_data
-    )
-})
-# user  system elapsed 
-# 1.04    0.78  646.40 
+
+if(load_loo)
+{ 
+  #if requested, load a previously-fitted version
+  loo_path = file.path(dirname(path_mod), paste0(basename(path_mod), 'LOO_m_all.Rdata'))  
+  if( file.exists(loo_path) ) 
+  {  load(file = loo_path)  
+  }else
+  {message( '\n', # if loading was requested and failed, inform the user
+            loo_path,
+            '\n not found. Recalculating loo.')}
+}
+if(!load_loo | !file.exists(loo_path) ) # only re-run if load not requested or possible
+{
+  system.time({
+      loom_all = parallel::parLapply(cl = clt,
+                           X = model_listlist,
+                           fun = Limp,
+                           impdata = imp_data
+      )
+  })
+  # user  system elapsed 
+  # 1.04    0.78  646.40 
+}
 if(save_loo)
 {
-  #TODO allow loading of previously generated list of LOO model validations
-  save(loom_all,file = dirname(path_file), paste0(basename(path_mod), 'LOO_m_all.Rdata'))
+  save(loom_all,file = file.path(dirname(path_mod), paste0(basename(path_mod), 'LOO_m_all.Rdata')) )
 }
 #for quick comparison, take the median values across imputed datasets
 #should be very fast
@@ -371,6 +404,23 @@ loom_cov = parallel::parLapply(cl = clt,
                      fn = CoefVar # sd/mean
                     )
 
+
+# . For reference, add criteria to the combined models --------------------
+#add criteria to the combined models before closing the parallel cluster
+#takes 10 minutes
+system.time({
+  ic_list = parallel::parLapply(cl = clt,
+                      X = comb_listlist,
+                     fun = add_criterion, 
+                     criterion = 'loo'
+                   )
+})
+## user  system elapsed 
+## 1.37    1.82  585.05 
+if(save_loo)
+{
+  save(ic_list, file = file.path(dirname(path_mod), paste0(basename(path_mod), 'LOO_m_all.Rdata')) )
+}
 #close the parallel cluster when no longer needed
 parallel::stopCluster(clt)
 
@@ -456,4 +506,125 @@ save(best_model,
      file = file.path(dirname(path_mod), 'best_model.Rdata') )
 save(best_model_list,
      file = file.path(dirname(path_mod), 'best_model_list.Rdata') )
+
+
+# Specific comparisons ----------------------------------------------------
+
+# . Is the chosen model much better than the null model? ------------------
+
+#chosen model
+# loom_agg$dspeed_mod
+  ##           Estimate  SE      
+  ## elpd_loo -238.2861 7.471583
+  ## p_loo    10.27591  2.11375 
+  ## looic    476.5723  14.94317
+#model with no effects, only a mean
+# loom_agg$null_mod
+  ##           Estimate  SE      
+  ## elpd_loo -240.3562 7.364742
+  ## p_loo    4.773523  1.344434
+  ## looic    480.7124  14.72948
+best_null_comp = with(loom_agg, 
+                      AggList(lst = list(null_mod,  dspeed_mod) , 
+                              fn = diff ) 
+                      )
+  ##           Estimate SE       
+  ## elpd_loo 2.070055 0.1068408 # higher likelihood
+  ## p_loo    5.502391 0.7693163
+  ## looic    -4.14011 0.2136816 # lower information criterion
+#compare combined models
+with(ic_list,
+     loo_compare(null_mod,
+                 dspeed_mod,
+                 criterion = 'loo')
+     )
+##           elpd_diff se_diff
+## dspeed_mod  0.0       0.0   
+## null_mod   -1.9       4.6 #lower likelihood
+
+# . Is the effect of Dspeed important? ------------------------------------
+
+#model without effect of dspeed
+# loom_agg$treat_mod
+  ##           Estimate SE      
+  ## elpd_loo -240.431 7.068704
+  ## p_loo    6.792667 1.762702
+  ## looic    480.862  14.13741
+dspeedtreat_comp = with(loom_agg, 
+                      AggList(lst = list(treat_mod, #compare with treatment only 
+                                         dspeed_mod) , #best model as reference
+                              fn = diff ) 
+                      )
+  ##           Estimate  SE       
+  ## elpd_loo 2.144831  0.4028792 # higher likelihood
+  ## p_loo    3.483246  0.3510476
+  ## looic    -4.289663 0.8057584 # lower information criterion
+
+#compare combined models
+with(ic_list,
+     loo_compare(treat_mod,
+                 dspeed_mod,
+                 criterion = 'loo')
+)
+##           elpd_diff se_diff
+## dspeed_mod  0.0       0.0   
+## treat_mod  -2.0       3.7  #lower likelihood
+
+# . Is the interaction of Dspeed & Treatment important? -------------------
+
+#TODO fit model with Treatment + Dspeed but without Treatment:Dspeed
                  
+
+# . Is the effect of Age important? ---------------------------------------
+
+#model with effects of age, dspeed & treatment and their 2-way interactions
+# loom_agg$two_interact_mod
+  ##           Estimate  SE      
+  ## elpd_loo -243.7768 7.822255
+  ## p_loo    17.41609  3.63594 
+  ## looic    487.5536  15.64451
+
+twoway_comp = with(loom_agg, 
+                        AggList(lst = list(two_interact_mod, #compare with two way interactions
+                                           dspeed_mod) , #best model as reference
+                                fn = diff ) 
+)
+  ##           Estimate  SE      
+  ## elpd_loo 5.490666  -0.3506721 # much higher likelihood
+  ## p_loo    -7.140181 -1.52219  
+  ## looic    -10.98133 -0.7013442 # much lower information criterion
+#compare combined models
+with(ic_list,
+     loo_compare(two_interact_mod,
+                 dspeed_mod,
+                 criterion = 'loo')
+)
+##                  elpd_diff se_diff
+## dspeed_mod        0.0       0.0   
+## two_interact_mod -6.1       2.3   
+
+#model with effects of age, treatment and their interaction (no dspeed)
+# loom_agg$age_mod
+  ##           Estimate  SE      
+  ## elpd_loo -241.5774 7.173215
+  ## p_loo    10.01907  2.010302
+  ## looic    483.1547  14.34643
+
+age_comp = with(loom_agg, 
+                   AggList(lst = list(treat_mod, #compare with treatment only 
+                                      age_mod) , #model with effect of age as reference
+                           fn = diff ) 
+)
+  ##           Estimate  SE       
+  ## elpd_loo -1.146382 0.1045111 # lower likelihood than treatment alone
+  ## p_loo    3.226399  0.2476003
+  ## looic    2.292765  0.2090222 # higher information criterion than treatment alone
+#compare combined models
+with(ic_list,
+     loo_compare(treat_mod,
+                 age_mod,
+                 criterion = 'loo')
+)
+##            elpd_diff se_diff
+## treat_mod  0.0       0.0   
+## age_mod   -1.1       1.8   
