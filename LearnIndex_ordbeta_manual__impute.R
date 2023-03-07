@@ -1,6 +1,6 @@
 # Details ---------------------------------------------------------------
 #       AUTHOR:	James Foster              DATE: 2023 24 01
-#     MODIFIED:	James Foster              DATE: 2023 02 17
+#     MODIFIED:	James Foster              DATE: 2023 03 07
 #
 #  DESCRIPTION: Loads ordbetareg functions and learning index dataset. Multiply
 #               imputes datasets to infer missing ages values. Fits and saves the
@@ -14,6 +14,7 @@
 #	   CHANGES: - Load updated ordbetareg version that works with LOO
 #             - Option to try to run >maximum number of threads in parallel
 #             - Model with only effects of Age and Treatment
+#             - Models without only interactions with Treatment
 #
 #   REFERENCES: Kubinec, R. (2022). 
 #               Ordered Beta Regression: A Parsimonious, Well-Fitting Model for 
@@ -274,6 +275,22 @@ dspeed_mu_mod =  bf( # set up a Bayesian model formula
 )
 
 #model with only effects of Dspeed and Treatment
+dspeed_noint_mod =  bf( # set up a Bayesian model formula
+  perc_corr ~ 0 + Intercept + 
+    Treatment + Dspeed, # effects on mean
+  phi ~ 0 + Intercept + 
+    Treatment + Dspeed, # effects on 1/variance
+  family = ordbeta_params$family # use the custom family defined above
+)
+
+#model with only effects of Dspeed and Treatment on the mean
+dspeed_noint_mu_mod =  bf( # set up a Bayesian model formula
+  perc_corr ~ 0 + Intercept + 
+    Treatment + Dspeed, # effects on mean
+  family = ordbeta_params$family # use the custom family defined above
+)
+
+#model with only effects of Age and Treatment
 age_mod =  bf( # set up a Bayesian model formula
   perc_corr ~ 0 + Intercept + 
     Treatment + Age + 
@@ -284,11 +301,27 @@ age_mod =  bf( # set up a Bayesian model formula
   family = ordbeta_params$family # use the custom family defined above
 )
 
-#model with only effects of Dspeed and Treatment on the mean
+#model with only effects of Age and Treatment on the mean
 age_mu_mod =  bf( # set up a Bayesian model formula
   perc_corr ~ 0 + Intercept + 
     Treatment + Age + 
     Treatment:Age, # effects on mean
+  family = ordbeta_params$family # use the custom family defined above
+)
+
+#model with only effects of Age and Treatment but no interaction
+age_noint_mod =  bf( # set up a Bayesian model formula
+  perc_corr ~ 0 + Intercept + 
+    Treatment + Age, # effects on mean
+  phi ~ 0 + Intercept + 
+    Treatment + Dspeed, # effects on 1/variance
+  family = ordbeta_params$family # use the custom family defined above
+)
+
+#model with only effects of Age and Treatment on the mean but no interaction
+age_noint_mu_mod =  bf( # set up a Bayesian model formula
+  perc_corr ~ 0 + Intercept + 
+    Treatment + Age, # effects on mean
   family = ordbeta_params$family # use the custom family defined above
 )
 
