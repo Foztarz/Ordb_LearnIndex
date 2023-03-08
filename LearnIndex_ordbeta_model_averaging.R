@@ -38,8 +38,7 @@ spare_cpu = TRUE # don't maximise parallelisation, takes longer but preserves pe
 ad_delta = 0.95 # closer to 1.0 means higher resolution sampling
 use_mice = FALSE # use functions for multiple imputation (now done manually)
 # load_loo = TRUE # load calculated LOO for each model previously
-# save_loo = # save calculated LOO for each model (may overwrite previous saved LOO)
-#   if(!load_loo){TRUE}else{FALSE} #to avoid overwriting, only save if not loading
+save_loo = TRUE #to avoid overwriting, only save if not loading
 
 # . Load packages ---------------------------------------------------------
 require(cmdstanr)#most efficient connection to Stan sampler
@@ -254,8 +253,9 @@ ordbeta_params = .load_ordbetareg(phi_reg = "both")
 
 #Some models are missing chains!
 #This will be a bit of work to fix...
-ndrw = sapply(X = ic_list, ndraws)
-sht_md = which(ndrw < max(ndrw))
+  # ndrw = sapply(X = model_listlist, 
+  #               FUN = function(i){sapply(i, ndraws)})
+  # sht_md = which(ndrw < max(ndrw))
 chns = lapply(X = model_listlist,
               FUN = function(i)
               {lapply(X = i, FUN  = nchains)}
@@ -292,54 +292,63 @@ clt = parallel::makeCluster( if(spare_cpu){floor(n_cores/n_chains)}else{n_cores-
 #this is slow and memory intensive, try to minimise the number of variables loaded
 # takes <5 seconds
 invisible({parallel::clusterEvalQ(cl = clt, expr = {library("brms")})})
+    # invisible({parallel::clusterEvalQ(cl = clt, expr = {library("ordbetareg")})})
 ReMissCh = function(mlst,
                     imp_data,
+                    prms = ordbeta_params,
                     mchain = max(unlist(
                                         sapply(X = mlst,
                                                FUN = function(x){ sapply(x, brms::nchains) })
                                         )),
                     ...)#passed to brm
 {
-  lapply(X = mlst,
-         FUN = function(mm, ...)
+  for(i in 1:length(mlst))
            {
-            lapply(X = 1:length(mm),
-                   FUN = function(i, ...)
-                     {
-                     md = mm[[i]]
-                     if(nchains(md)<mchain)
-                     {
-                       md = brm(formula = formula(md),
-                                data = imp_data[[i]],
-                                ...
-                       )
-                     }
-                     return(md)
-                   },
-                   imp_data = imp_data,
-                   mchain = mchain
-                   )
+             if(brms::nchains(mlst[[i]])<mchain)
+             {
+               md = mlst[[i]]
+               mlst[[i]] = brm(formula = brms::bf(formula(md), 
+                                           family = prms$family),
+                        data = imp_data[[i]],
+                        ...
+               )
+             }
            }
-         )
+          return(mlst)
 }
+
+
+#run in parallel
+#takes less than 2 minutes
 system.time({
-  model_listlist = parallel::parLapply(
+  # model_listlist = lapply(
+    # FUN = ReMissCh,
+model_listlist = parallel::parLapply(
     cl = clt, # the parallel cluster, might make things faster
-    X = model_listlist,#N.B. this will be overwritten
     fun = ReMissCh,
+    X = model_listlist,#N.B. this will be overwritten
+    mchain = n_chains,#max(unlist(chns)),
     imp_data = df_manimp,
     cores = if(spare_cpu){n_chains}else{1}, # multiple models can be fitted in parallel using parLapply
     chains =  n_chains,
     iter = n_iter,
     init = '0',
     backend = 'cmdstanr',
+    prms = ordbeta_params,
     stanvars = ordbeta_params$stanvars,
     control = list( adapt_delta = ad_delta ), # closer to 1.0 means higher resolution sampling
     silent = 2, #don't print lots of iteration information
-    refresh = 0,
-    combine = FALSE # return a list of fits
+    refresh = 0
   )
 })
+## user  system elapsed 
+## 1.97    1.33   64.75 
+
+chns_after = lapply(X = model_listlist,
+              FUN = function(i)
+              {lapply(X = i, FUN  = brms::nchains)}
+)
+summary(unlist(chns_after))
 
 # . Combine across imputation for each formula ----------------------------
 
@@ -360,6 +369,7 @@ comb_listlist = lapply(X = model_listlist,
 summary(sapply(comb_listlist, ndraws)) # all now 200000
 
 # Find best model ---------------------------------------------------------
+#could take 15 minutes
 path_ic = file.path(dirname(path_mod), paste0(basename(path_mod), 'ic_comb.Rdata'))
   system.time({
     comb_listlist = parallel::parLapply(cl = clt,
@@ -369,7 +379,7 @@ path_ic = file.path(dirname(path_mod), paste0(basename(path_mod), 'ic_comb.Rdata
     )
 })
 ## user  system elapsed 
-## 1.91    2.22  928.56 
+## 1.91    2.22  928.56   #memory limits may be slowing this down
 if(save_loo | !file.exists(path_ic))
 {
   save(comb_listlist, file = path_ic )
