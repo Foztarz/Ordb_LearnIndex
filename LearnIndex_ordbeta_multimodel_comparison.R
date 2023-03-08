@@ -292,10 +292,10 @@ invisible({parallel::clusterEvalQ(cl = clt, expr = {library("brms")})})
 
 #single (imputed) dataset estimates give a good approximation of the full combined model
 #takes almost 10 minutes
+lop_path = file.path(dirname(path_mod), paste0(basename(path_mod), 'LOO_test.Rdata'))  
 if(load_loo)
   { 
 #if requested, load a previously-fitted version
-  lop_path = file.path(dirname(path_file), paste0(basename(path_mod), 'LOO_test.Rdata'))  
    if( file.exists(lop_path) ) 
      {  load(file = lop_path ) 
      }else
@@ -322,7 +322,7 @@ if(!load_loo | !file.exists(lop_path) ) # only re-run if load not requested or p
 ## 0.97    0.86  409.52 #mostly overhead from importing and exporting to cluster
 }
 
-if(save_loo)
+if(save_loo| !file.exists(lop_path))
 {
   #TODO allow loading of previously generated test
   save(lop_test,
@@ -366,10 +366,10 @@ if(use_mice)
 #apply Leave-One-Out validation to all models for all imputed datasets
 #could take up to 15 minutes for 7 models
 
+loo_path = file.path(dirname(path_mod), paste0(basename(path_mod), 'LOO_m_all.Rdata'))  
 if(load_loo)
 { 
   #if requested, load a previously-fitted version
-  loo_path = file.path(dirname(path_mod), paste0(basename(path_mod), 'LOO_m_all.Rdata'))  
   if( file.exists(loo_path) ) 
   {  load(file = loo_path)  
   }else
@@ -389,7 +389,7 @@ if(!load_loo | !file.exists(loo_path) ) # only re-run if load not requested or p
   # user  system elapsed 
   # 1.04    0.78  646.40 
 }
-if(save_loo)
+if(save_loo| !file.exists(loo_path))
 {
   save(loom_all,file = file.path(dirname(path_mod), paste0(basename(path_mod), 'LOO_m_all.Rdata')) )
 }
@@ -411,6 +411,8 @@ loom_cov = parallel::parLapply(cl = clt,
 # . For reference, add criteria to the combined models --------------------
 #add criteria to the combined models before closing the parallel cluster
 #takes 10 minutes
+
+path_ic = file.path(dirname(path_mod), paste0(basename(path_mod), 'ic_comb.Rdata'))
 system.time({
   ic_list = parallel::parLapply(cl = clt,
                       X = comb_listlist,
@@ -420,10 +422,13 @@ system.time({
 })
 ## user  system elapsed 
 ## 1.37    1.82  585.05 
-if(save_loo)
+if(save_loo | !file.exists(path_ic))
 {
-  save(ic_list, file = file.path(dirname(path_mod), paste0(basename(path_mod), 'LOO_m_all.Rdata')) )
+  save(ic_list, file = path_ic )
 }
+# remove the original list, ic_list should be a duplicate with extra features
+rm('comb_listlist')
+
 #close the parallel cluster when no longer needed
 parallel::stopCluster(clt)
 
@@ -656,8 +661,4 @@ with(ic_list,
 ##            elpd_diff se_diff
 ## treat_mod  0.0       0.0   
 ## age_mod   -1.1       1.8   
-
-
-# Model averaging? --------------------------------------------------------
-
 
