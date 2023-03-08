@@ -371,15 +371,18 @@ summary(sapply(comb_listlist, ndraws)) # all now 200000
 # Find best model ---------------------------------------------------------
 #could take 15 minutes
 path_ic = file.path(dirname(path_mod), paste0(basename(path_mod), 'ic_comb.Rdata'))
+if(!file.exists(path_ic))
+{
   system.time({
     comb_listlist = parallel::parLapply(cl = clt,
                                   X = comb_listlist,
                                   fun = add_criterion, 
                                   criterion = 'loo'
     )
-})
+  })
 ## user  system elapsed 
-## 1.91    2.22  928.56   #memory limits may be slowing this down
+## 1.69    1.98  821.22    #memory limits may be slowing this down
+}
 if(save_loo | !file.exists(path_ic))
 {
   save(comb_listlist, file = path_ic )
@@ -395,7 +398,8 @@ l_all = sapply(X= comb_listlist,
 best_model_name = names(which.max(l_all))
 
 system.time({
-  lc = do.call(what = loo_compare,
+  # lc = #maybe don't save output
+    do.call(what = loo_compare,
                args = within(comb_listlist,
                              {x = get(best_model_name) # 1st argument always needs to be x
                              rm(list = best_model_name)
@@ -403,7 +407,7 @@ system.time({
               )
 })
 ## user  system elapsed 
-## 109.61    0.30  111.39 
+## 103.62    0.54  104.61 
 
 # Model averaging ---------------------------------------------------------
 
