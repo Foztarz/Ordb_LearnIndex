@@ -1,6 +1,6 @@
 # Details ---------------------------------------------------------------
 #       AUTHOR:	James Foster              DATE: 2023 02 10
-#     MODIFIED:	James Foster              DATE: 2023 03 07
+#     MODIFIED:	James Foster              DATE: 2023 03 08
 #
 #  DESCRIPTION: Loads a set of ordbetareg models and the associated data and
 #               functions. The models are then compared using leave-one-out
@@ -35,6 +35,7 @@
 #- Exclude unused modelling functions +
 #- Troubleshoot pp_check_ordbeta  +
 #- Try recommended LOO averaging https://discourse.mc-stan.org/t/how-would-loo-with-multiple-imputations-look-like/11998
+#- Try recommended model averaging
 
 # Starting parameters -----------------------------------------------------
 n_iter = 1e3 # number of modelling iterations to run, 1e2 is faster, 1e4 is more accurate
@@ -574,8 +575,33 @@ with(ic_list,
 
 # . Is the interaction of Dspeed & Treatment important? -------------------
 
-#TODO fit model with Treatment + Dspeed but without Treatment:Dspeed
-                 
+
+#model without effect of dspeed
+# loom_agg$treat_mod
+##           Estimate SE      
+## elpd_loo -240.431 7.068704
+## p_loo    6.792667 1.762702
+## looic    480.862  14.13741
+dspeedint_comp = with(loom_agg, 
+                        AggList(lst = list(dspeed_noint_mod, #compare with treatment only 
+                                           dspeed_mod) , #best model as reference
+                                fn = diff ) 
+)
+##           Estimate  SE       
+## elpd_loo -0.4637195 0.1364418 # slightly lower likelihood, not great for our conclusions
+## p_loo    1.991507   0.2034555
+## looic    0.9274389  0.2728837 # slightly higher information criterion
+
+#compare combined models
+with(ic_list,
+     loo_compare(dspeed_noint_mod,
+                 dspeed_mod,
+                 criterion = 'loo')
+)
+##                    elpd_diff se_diff
+## dspeed_noint_mod  0.0       0.0   
+## dspeed_mod       -0.5       2.3  
+
 
 # . Is the effect of Age important? ---------------------------------------
 
@@ -630,3 +656,8 @@ with(ic_list,
 ##            elpd_diff se_diff
 ## treat_mod  0.0       0.0   
 ## age_mod   -1.1       1.8   
+
+
+# Model averaging? --------------------------------------------------------
+
+
