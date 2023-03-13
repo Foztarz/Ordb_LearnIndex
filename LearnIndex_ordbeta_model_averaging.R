@@ -1,6 +1,6 @@
 # Details ---------------------------------------------------------------
 #       AUTHOR:	James Foster              DATE: 2023 03 08
-#     MODIFIED:	James Foster              DATE: 2023 03 08
+#     MODIFIED:	James Foster              DATE: 2023 03 13
 #
 #  DESCRIPTION: Loads a set of ordbetareg models and the associated data and
 #               functions. The models are then averaged across a range of 
@@ -11,7 +11,8 @@
 #               
 #      OUTPUTS: Best models chosen and the list of imputed models with that formula
 #
-#	   CHANGES: - 
+#	   CHANGES: - save as much as possible
+#             - abandon do.call approach (doesn't find object name)
 #
 #   REFERENCES: Kubinec, R. (2022). 
 #               Ordered Beta Regression: A Parsimonious, Well-Fitting Model for 
@@ -25,8 +26,8 @@
 #       USAGE:  
 #TODO   ---------------------------------------------
 #TODO   
-#- fix missing chains
-#- chose models of interest
+#- fix missing chains +
+#- chose models of interest +
 #- save averaged model
 
 # Starting parameters -----------------------------------------------------
@@ -253,38 +254,15 @@ ordbeta_params = .load_ordbetareg(phi_reg = "both")
 
 #Some models are missing chains!
 #This will be a bit of work to fix...
-  # ndrw = sapply(X = model_listlist, 
-  #               FUN = function(i){sapply(i, ndraws)})
-  # sht_md = which(ndrw < max(ndrw))
+
+#find how many chains each
 chns = lapply(X = model_listlist,
               FUN = function(i)
-              {lapply(X = i, FUN  = nchains)}
+              {lapply(X = i, FUN  = brms::nchains)}
 )
-# system.time({
-# for(ii in sht_md)
-# {
-#   ch = sapply(X = model_listlist[[ii]], nchains)
-#   for(jj in which(ch < max(unlist(chns))) )
-#   {
-#     md_tmp = model_listlist[[ii]][[jj]]
-#     model_listlist[[ii]][[jj]] = brm(formula = formula(md_tmp),
-#                                      data = df_manimp[[jj]],
-#                                      family = ordbeta_params$family, # use the custom family defined above
-#                                      cores = if(spare_cpu){n_chains}else{1}, # multiple models can be fitted in parallel using parLapply
-#                                      chains =  n_chains,
-#                                      iter = n_iter,
-#                                      init = '0',
-#                                      backend = 'cmdstanr',
-#                                      stanvars = ordbeta_params$stanvars,
-#                                      control = list( adapt_delta = ad_delta ), # closer to 1.0 means higher resolution sampling
-#                                      silent = 2, #don't print lots of iteration information
-#                                      refresh = 0
-#                                     )
-#   }
-# }
-# })
-## user  system elapsed 
-## 22.61    5.70  415.64 
+
+
+# . Set up parallel cluster -----------------------------------------------
 
 clt = parallel::makeCluster( if(spare_cpu){floor(n_cores/n_chains)}else{n_cores-1},
                              type = 'PSOCK')
@@ -366,7 +344,14 @@ comb_listlist = lapply(X = model_listlist,
 ## null_formula         treat_formula      treat_mu_formula 
 ## "brmsfit"                   "brmsfit"                   "brmsfit" 
 
-summary(sapply(comb_listlist, ndraws)) # all now 200000
+sy = summary(sapply(comb_listlist, ndraws)) # all now 200000
+if(any(diff(range(sy))))
+  {stop('Models do not have the same length\n', sy)}else
+  {print(sy)}
+
+
+# . Tidy up ---------------------------------------------------------------
+rm(model_listlist) # not used beyond this point
 
 # Find best model ---------------------------------------------------------
 #could take 15 minutes
@@ -382,99 +367,235 @@ if(!file.exists(path_ic))
   })
 ## user  system elapsed 
 ## 1.69    1.98  821.22    #memory limits may be slowing this down
-}
+}else
+{load(path_ic)}
+
 if(save_loo | !file.exists(path_ic))
 {
   save(comb_listlist, file = path_ic )
 }
-  
+
 #close the parallel cluster when no longer needed
 parallel::stopCluster(clt)
 
+#extract loo estimates
 l_all = sapply(X= comb_listlist,
                 FUN = function(x)
-                  {loo(x)$estimates[1]}
+                  {loo(x)$estimates[1]} #loo_elpd (higher is better)
                )
-best_model_name = names(which.max(l_all))
 
+#find best model
+best_model_name = names(which.max(l_all))
+#sort and assess
+l_all = sort(l_all, decreasing = TRUE)
+l_diff = l_all - l_all[1]
+l_null = l_all - l_all['null_mod']
+
+print(  round(cbind(elpd = l_all, best =  l_diff, null = l_null), 2 )  )
+##                       elpd  best  null
+## dspeed_noint_mod    -237.87  0.00  2.50  # best model has no interaction of Dspeed & Treatment
+## dspeed_noint_mu_mod -238.17 -0.30  2.20
+## dspeed_mod          -238.38 -0.52  1.98  # interaction of Dspeed & Treatment within 1.0 of best
+## dspeed_mu_mod       -238.47 -0.60  1.90  
+## dspeed_age_mu_mod   -239.20 -1.33  1.17
+## age_noint_mod       -239.63 -1.77  0.73  # within 1.0 of null model
+## treat_mu_mod        -240.11 -2.25  0.26  # within 1.0 of null model
+## null_mod            -240.37 -2.50  0.00  
+## age_noint_mu_mod    -240.41 -2.55 -0.05  # worse than null model
+## treat_mod           -240.49 -2.62 -0.12  # worse than null model
+## dspeed_age_mod      -240.58 -2.71 -0.21  # worse than null model
+## age_mod             -240.74 -2.88 -0.38  # worse than null model
+## age_mu_mod          -241.52 -3.65 -1.15  # worse than null model
+## two_interact_mu_mod -241.65 -3.78 -1.28  # worse than null model
+## max_mu_mod          -243.04 -5.17 -2.67  # worse than null model
+## two_interact_mod    -245.01 -7.14 -4.64  # worse than null model
+## max_mod             -247.69 -9.83 -7.33  # worse than null model
+
+#could take >3 minutes
+path_lc = file.path(dirname(path_mod), paste0(basename(path_mod), 'loo_comp.Rdata'))
+if(!file.exists(path_lc))
+{
 system.time({
-  # lc = #maybe don't save output
-    do.call(what = loo_compare,
-               args = within(comb_listlist,
-                             {x = get(best_model_name) # 1st argument always needs to be x
-                             rm(list = best_model_name)
-                             criterion = 'loo'})
-              )
+  #do.call version hits recursion limits
+  ## Error: C stack usage  36171070 is too close to the limit
+  lc =
+    with(comb_listlist,#use non-vectorised version to avoid recursion overflow
+         #N.B. this will need to be changed for every update to the formula list
+    loo_compare(x = dspeed_noint_mod,
+                dspeed_noint_mod,
+                dspeed_noint_mu_mod,
+                dspeed_mod,      
+                dspeed_mu_mod,  
+                dspeed_age_mu_mod,
+                age_noint_mod,      
+                treat_mu_mod,
+                null_mod,   
+                age_noint_mu_mod,
+                treat_mod,     
+                dspeed_age_mod,
+                age_mod,         
+                age_mu_mod,
+                two_interact_mu_mod,
+                max_mu_mod,         
+                two_interact_mod,   
+                max_mod, 
+                criterion = 'loo'   )
+    )
 })
 ## user  system elapsed 
-## 103.62    0.54  104.61 
+## 177.8 0.61    179.4
+}
+if(save_loo | !file.exists(path_lc))
+{
+  save(lc, file = path_lc )
+}
+
+
+#having some trouble printing output
+#possibly too much in memory
+#save and try later
+
 
 # Model averaging ---------------------------------------------------------
 
+
+# . Calculate weights -----------------------------------------------------
+
 #N.B. requires all models to have exactly the same numbers of draws
 #seems to take a long time, almost 30 min!
-system.time({
-weights_models = do.call(what = brms::loo_model_weights,
-                          args = within(comb_listlist,
-                                        {
-                                        x = get(best_model_name) # 1st argument always needs to be x
-                                        rm(list = best_model_name)
-                                        # model_names = c(best_model_name,
-                                        #                 names(comb_listlist)[
-                                        #                   !(names(comb_listlist) %in% best_model_name) ]
-                                        #                 )
-                                        }
-                                        )
-                        )
-})
+path_wt = file.path(dirname(path_mod), paste0(basename(path_mod), 'wt_comb.Rdata'))
+if(!file.exists(path_wt))
+{
+  system.time({
+    weights_models = #only way to ensure interpretable names is to name the models explicitly
+                     with(comb_listlist,
+                       brms::loo_model_weights(x = dspeed_noint_mod,
+                                              dspeed_noint_mod,
+                                              dspeed_noint_mu_mod,
+                                              dspeed_mod,      
+                                              dspeed_mu_mod,  
+                                              dspeed_age_mu_mod,
+                                              age_noint_mod,      
+                                              treat_mu_mod,
+                                              null_mod,   
+                                              age_noint_mu_mod,
+                                              treat_mod,     
+                                              dspeed_age_mod,
+                                              age_mod,         
+                                              age_mu_mod,
+                                              two_interact_mu_mod,
+                                              max_mu_mod,         
+                                              two_interact_mod,   
+                                              max_mod)
+                     )
+    })
+}
+print( cbind(round(sort(weights_models,decreasing = TRUE),3)) )
+
 # user  system elapsed 
-# 1354.74  132.61 1662.41 
+# 942.79   96.06 1150.18   
+if(save_loo | !file.exists(path_wt))
+{
+  save(weights_models, file = path_wt )
+}
+
+#having some trouble printing output
 
 ## Method: stacking
-## ------
-##   weight
-## dspeed_noint_mod    0.000 
-## age_mod             0.000 
-## age_mu_mod          0.000 
-## age_noint_mod       0.157 
-## age_noint_mu_mod    0.112 
-## dspeed_age_mod      0.000 
-## dspeed_age_mu_mod   0.170 
-## dspeed_mod          0.238 #gets highest weighting as we would expect, or are the names scrambled?
-## dspeed_mu_mod       0.017 
-## dspeed_noint_mu_mod 0.219 
-## max_mod             0.000 
-## max_mu_mod          0.000 
-## null_mod            0.086 
-## treat_mod           0.000 
-## treat_mu_mod        0.000 
-## two_interact_mod    0.000 
-## two_interact_mu_mod 0.000 
+## --- ---
+##                    weight
+## dspeed_mod          0.258 # highest weighting as we would expect
+## dspeed_noint_mu_mod 0.257 # without phi effects, no dspeed-treatment interaction suggested
+## age_noint_mod       0.163
+## dspeed_age_mu_mod   0.153
+## age_noint_mu_mod    0.085
+## null_mod            0.084
+## dspeed_mu_mod       0.000
+## dspeed_noint_mod    0.000
+## dspeed_noint_mod    0.000
+## age_mod             0.000
+## two_interact_mu_mod 0.000
+## treat_mu_mod        0.000
+## treat_mod           0.000
+## age_mu_mod          0.000
+## dspeed_age_mod      0.000
+## max_mu_mod          0.000
+## max_mod             0.000
+## two_interact_mod    0.000
 
 
+# . Average fit -----------------------------------------------------------
+path_av = file.path(dirname(path_mod), paste0(basename(path_mod), 'av_model.Rdata'))
+if(!file.exists(path_av))
+{
 system.time({
-  average_model = do.call(what = brms::pp_average,
-                          args = within(ic_list,
-                                        {
-                                          x = get(best_model_name) # 1st argument always needs to be x
-                                          rm(list = best_model_name)
-                                          method = 'fitted'
-                                        }
+  average_model = 
+    with(comb_listlist,
+          brms::pp_average(x = dspeed_noint_mod,
+                            dspeed_noint_mod,
+                            dspeed_noint_mu_mod,
+                            dspeed_mod,      
+                            dspeed_mu_mod,  
+                            dspeed_age_mu_mod,
+                            age_noint_mod,      
+                            treat_mu_mod,
+                            null_mod,   
+                            age_noint_mu_mod,
+                            treat_mod,     
+                            dspeed_age_mod,
+                            age_mod,         
+                            age_mu_mod,
+                            two_interact_mu_mod,
+                            max_mu_mod,         
+                            two_interact_mod,   
+                            max_mod,
+                            method = 'fitted',
+                            robust = TRUE
                           )
   )
 })
 # user  system elapsed 
 # 136.37   12.58  151.11 
+}
+
+if(save_loo | !file.exists(path_av))
+{
+  save(average_model, file = path_av )
+}
 
 
+# . Average posterior -----------------------------------------------------
+path_po = file.path(dirname(path_mod), paste0(basename(path_mod), 'av_posterior.Rdata'))
+if(!file.exists(path_po))
+{
 system.time({
-  average_post = do.call(what = brms::posterior_average,
-                          args = within(ic_list,
-                                        {
-                                          x = get(best_model_name) # 1st argument always needs to be x
-                                          rm(list = best_model_name)
-                                          ndraws = 1e3
-                                        }
-                          )
-  )
-})
+    average_post = 
+      with(comb_listlist, 
+           brms::posterior_average(x = dspeed_noint_mod,
+                                    dspeed_noint_mod,
+                                    dspeed_noint_mu_mod,
+                                    dspeed_mod,      
+                                    dspeed_mu_mod,  
+                                    dspeed_age_mu_mod,
+                                    age_noint_mod,      
+                                    treat_mu_mod,
+                                    null_mod,   
+                                    age_noint_mu_mod,
+                                    treat_mod,     
+                                    dspeed_age_mod,
+                                    age_mod,         
+                                    age_mu_mod,
+                                    two_interact_mu_mod,
+                                    max_mu_mod,         
+                                    two_interact_mod,   
+                                    max_mod,
+                                    ndraws = 1e3
+                            )
+    )
+  })
+}
+
+if(save_loo | !file.exists(path_post))
+{
+  save(average_post, file = path_post )
+}
