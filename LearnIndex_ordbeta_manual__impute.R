@@ -296,8 +296,8 @@ age_mod =  bf( # set up a Bayesian model formula
     Treatment + Age + 
     Treatment:Age, # effects on mean
   phi ~ 0 + Intercept + 
-    Treatment + Dspeed + 
-    Treatment:Dspeed, # effects on 1/variance
+    Treatment + Age + 
+    Treatment:Age, # effects on 1/variance
   family = ordbeta_params$family # use the custom family defined above
 )
 
@@ -314,7 +314,7 @@ age_noint_mod =  bf( # set up a Bayesian model formula
   perc_corr ~ 0 + Intercept + 
     Treatment + Age, # effects on mean
   phi ~ 0 + Intercept + 
-    Treatment + Dspeed, # effects on 1/variance
+    Treatment + Age, # effects on 1/variance
   family = ordbeta_params$family # use the custom family defined above
 )
 
@@ -386,21 +386,6 @@ OrdBetaImpute = function(formula_i,
 # N.B. the multithreading uses up a a lot of CPU!
 clt = parallel::makeCluster( if(spare_cpu){floor(n_cores/n_chains)}else{n_cores-1},
                             type = 'PSOCK')
-#export variables and functions that will be used by the parallel functions
-#this is slow and memory intensive, try to minimise the number of variables loaded
-    # parallel::clusterExport(cl = clt,
-    #                         varlist = c(
-    #                                       'form_list',
-    #                                     'OrdBetaImpute',
-                                        # 'df'#,
-    #                                     'df_manimp',
-    #                                     'n_chains',
-    #                                     'n_iter',
-    #                                     'ordbeta_params',
-    #                                     'get_prior',
-    #                                     'brm_multiple'
-    #                         )
-    # )
 # takes <5 seconds
 invisible({parallel::clusterEvalQ(cl = clt, expr = {library("brms")})})
 
