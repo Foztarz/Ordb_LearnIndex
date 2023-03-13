@@ -525,6 +525,7 @@ if(save_loo | !file.exists(path_wt))
 
 
 # . Average fit -----------------------------------------------------------
+#Compute posterior predictive draws averaged across models. 
 path_av = file.path(dirname(path_mod), paste0(basename(path_mod), 'av_model.Rdata'))
 if(!file.exists(path_av))
 {
@@ -554,15 +555,22 @@ system.time({
                           )
   )
 })
-# user  system elapsed 
-# 136.37   12.58  151.11 
+  ## user  system elapsed 
+  ## 1302.28  139.39 1599.67
 }
 
 if(save_loo | !file.exists(path_av))
 {
   save(average_model, file = path_av )
 }
-
+plot(x = df_manimp[[1]]$Dspeed,
+     y = average_model[,'Estimate']*2-1,
+     xlab = 'Dspeed',
+     ylab = 'Lind',
+     ylim = c(-1,1),
+     pch = 19,
+     col = gray(0, 0.5)
+     )
 
 # . Average posterior -----------------------------------------------------
 path_po = file.path(dirname(path_mod), paste0(basename(path_mod), 'av_posterior.Rdata'))
@@ -571,31 +579,34 @@ if(!file.exists(path_po))
 system.time({
     average_post = 
       with(comb_listlist, 
-           brms::posterior_average(x = dspeed_noint_mod,
-                                    dspeed_noint_mod,
-                                    dspeed_noint_mu_mod,
-                                    dspeed_mod,      
-                                    dspeed_mu_mod,  
-                                    dspeed_age_mu_mod,
+           brms::posterior_average(x = 
+                                    dspeed_mod,      #include only models with the effects from dspeed_mod
                                     age_noint_mod,      
-                                    treat_mu_mod,
-                                    null_mod,   
-                                    age_noint_mu_mod,
-                                    treat_mod,     
                                     dspeed_age_mod,
-                                    age_mod,         
-                                    age_mu_mod,
-                                    two_interact_mu_mod,
-                                    max_mu_mod,         
+                                    age_mod,
                                     two_interact_mod,   
                                     max_mod,
+                                   # dspeed_noint_mod, 
+                                   # dspeed_noint_mod,
+                                   #  dspeed_noint_mu_mod,
+                                   #  dspeed_mu_mod,  
+                                    # dspeed_age_mu_mod,
+                                    # treat_mu_mod,
+                                    # null_mod,   
+                                    # age_noint_mu_mod,
+                                    # treat_mod,     
+                                    # age_mu_mod,
+                                    # two_interact_mu_mod,
+                                    # max_mu_mod,         
                                     ndraws = 1e3
                             )
     )
   })
+ 
 }
+
 
 if(save_loo | !file.exists(path_post))
 {
-  save(average_post, file = path_post )
+  save(average_post, file = path_po )
 }
