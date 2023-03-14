@@ -57,6 +57,19 @@ These predictions are also saved in a series of ```.csv``` files ("[model_name].
 Finally, a set of summary statistics are calculated for the pooled estimates of coefficients across all imputed datasets.
 These are saved in a ```.csv``` file ("[model_name]__results.csv").
 
+
+### Average models
+To average across the fitted models, run [**LearnIndex_ordbeta_model_averaging.R**](LearnIndex_ordbeta_model_averaging.R) and select the imputed data ```_imputed.Rdata``` 
+and model list produced by **LearnIndex_ordbeta_manual__impute.R**.
+In the _Starting parameters_ section (```save_loo = TRUE```), the 
+the user can choose whether to save the output to load on the next run (```load_loo = TRUE```)
+saving calculation time.
+The summary statistics for the averaged posterior draws ("[model_name]..._av_posterior..._summary[.csv]") 
+and the predictions for the averaged model 
+ ("[model_name]..._av_model..._plot[.csv]")
+ are saved in the same director as the original model list.
+
+
 # File manifest
 
 #### **- [Install_ordbetareg.R](Install_ordbetareg.R)**
@@ -73,6 +86,11 @@ Impute missing data, and fit and save ordered beta regression models across all 
 
 Compare the fitted models using [leave-one-out cross-validation](https://mc-stan.org/loo/) 
 and save the model with the best predictive performance.
+
+#### **- [LearnIndex_ordbeta_model_averaging.R](LearnIndex_ordbeta_model_averaging.R)**
+
+Calculate [stacking weights](http://www.stat.columbia.edu/~gelman/research/published/stacking_paper_discussion_rejoinder.pdf) for the fitted models and average across posterior
+draws and predictions to improve model predictions.
 
 
 #### **- [LearnIndex_ordbeta_inspect.R](LearnIndex_ordbeta_inspect.R)**
