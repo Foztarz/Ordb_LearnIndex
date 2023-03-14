@@ -234,10 +234,10 @@ chns = lapply(X = model_listlist,
               FUN = function(i)
               {lapply(X = i, FUN  = brms::nchains)}
 )
-
-if(any(diff(range(chns))))
+#TODO find out why this happens in non-interactive sessions!
+if(any(ceiling(diff(range(chns)))))
 {
-  message('Chains missing in ', path_mod, ' recalculating...')
+  message('Chains missing in ', path_mod, ', \nrecalculating...')
 
 # . Set up parallel cluster -----------------------------------------------
   
@@ -320,7 +320,7 @@ comb_listlist = lapply(X = model_listlist,
 ## "brmsfit"                   "brmsfit"                   "brmsfit" 
 
 sy = summary(sapply(comb_listlist, ndraws)) # all now 200000
-if(any(diff(range(sy))))
+if(any(ceiling(diff(range(sy)))))
   {stop('Models do not have the same length\n', sy)}else
   {print(sy)}
 
