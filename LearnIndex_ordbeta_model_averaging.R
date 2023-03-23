@@ -32,9 +32,9 @@
 #- tidy up +
 
 # Starting parameters -----------------------------------------------------
-load_loo = FALSE # load calculated LOO for each model previously (if found)?
-save_loo = TRUE #should the results be saved if not loading?
-overwrite_loo = TRUE #even if it will overwrite existing files?
+load_loo = TRUE # load calculated LOO for each model previously (if found)?
+save_loo = FALSE #should the results be saved if not loading?
+overwrite_loo = FALSE #even if it will overwrite existing files?
 #modelling parameters (see LearnIndex_ordbeta_manual__impute)
 n_iter = 1e3 # number of modelling iterations to run, 1e2 is faster, 1e4 is more accurate
 n_pred = 2e1 # number of predictions levels to run, 5e0 is faster, 2e1 is smoother
@@ -235,7 +235,7 @@ chns = lapply(X = model_listlist,
               {lapply(X = i, FUN  = brms::nchains)}
 )
 #TODO find out why this happens in non-interactive sessions!
-if(any(ceiling(diff(range(chns)))))
+if(as.logical(diff(range(chns))))
 {
   message('Chains missing in ', path_mod, ', \nrecalculating...')
 
@@ -320,7 +320,7 @@ comb_listlist = lapply(X = model_listlist,
 ## "brmsfit"                   "brmsfit"                   "brmsfit" 
 
 sy = summary(sapply(comb_listlist, ndraws)) # all now 200000
-if(any(ceiling(diff(range(sy)))))
+if(as.logical(diff(range(sy))))
   {stop('Models do not have the same length\n', sy)}else
   {print(sy)}
 
