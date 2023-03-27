@@ -32,9 +32,9 @@
 #- tidy up +
 
 # Starting parameters -----------------------------------------------------
-load_loo = TRUE # load calculated LOO for each model previously (if found)?
-save_loo = FALSE #should the results be saved if not loading?
-overwrite_loo = FALSE #even if it will overwrite existing files?
+load_loo = FALSE # load calculated LOO for each model previously (if found)?
+save_loo = TRUE #should the results be saved if not loading?
+overwrite_loo = TRUE #even if it will overwrite existing files?
 #modelling parameters (see LearnIndex_ordbeta_manual__impute)
 n_iter = 1e3 # number of modelling iterations to run, 1e2 is faster, 1e4 is more accurate
 n_pred = 2e1 # number of predictions levels to run, 5e0 is faster, 2e1 is smoother
