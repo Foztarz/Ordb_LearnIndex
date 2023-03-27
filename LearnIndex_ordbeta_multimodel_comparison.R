@@ -201,10 +201,10 @@ rm(imp_load)#original named variable no longer needed, remove
 
 
 # Select and load all models  -------------------------------------------
-path_mod = list.files(path = dirname(path_file),
-                      pattern = "_allmodels.Rdata",
+path_mod = list.files(path = file.path(dirname(path_file)),
+                      pattern = '_allmodels\\.Rdata',
                       full.names = TRUE
-                      )
+                      ) # TODO fix for non-interactive session
 if(length(path_mod))
 {
   path_mod = path_mod[[1]]
@@ -261,7 +261,7 @@ if(pp_plots) # In CRAN version make sure to set 'reverse_bounds' to FALSE
     #use the ordbetareg function for plotting posterior predictive checks
     plt_tmp = ordbetareg::pp_check_ordbeta(comb_listlist[[i]], 
                                        ndraws = 100, reverse_bounds = FALSE)
-    #plot the proportions of discrete and condituous data with the model details
+    #plot the proportions of discrete and continuous data with the model details
     plot(plt_tmp$discrete + 
       ggtitle(label = names(comb_listlist)[i], # model name as title
       subtitle = formula(comb_listlist[[i]])) # model formula as subtitle
@@ -331,19 +331,23 @@ if(save_loo| !file.exists(lop_path))
 
 print(loo_compare(x = lop_test))
 ##                         elpd_diff se_diff
-## dspeed_mod           0.0       0.0   
-## dspeed_mu_mod        0.0       3.0   
-## dspeed_age_mu_mod   -1.2       3.1   
-## dspeed_age_mod      -1.3       1.6   
-## treat_mu_mod        -1.7       4.1   
-## null_mod            -1.9       4.6   
-## treat_mod           -2.0       3.7   
-## age_mod             -3.2       3.3   
-## two_interact_mu_mod -3.5       3.6   
-## age_mu_mod          -3.9       4.3   
-## max_mu_mod          -4.6       4.0   
-## two_interact_mod    -6.1       2.3   
-## max_mod             -8.1       3.6   
+## dspeed_noint_mod      0.0       0.0  
+## dspeed_noint_mu_mod  -0.3       2.4  
+## dspeed_mod           -0.5       2.3  
+## dspeed_mu_mod        -0.6       2.6  
+## dspeed_age_mu_mod    -1.9       2.6  
+## treat_mu_mod         -2.3       2.8  
+## null_mod             -2.5       3.4  
+## treat_mod            -2.7       2.3  
+## dspeed_age_mod       -3.4       2.3  
+## age_noint_mu_mod     -3.5       2.9  
+## two_interact_mu_mod  -4.3       3.4  
+## age_mu_mod           -4.5       2.9  
+## age_noint_mod        -5.7       2.5  
+## max_mu_mod           -6.1       3.9  
+## two_interact_mod     -7.9       3.5  
+## age_mod              -8.3       2.8  
+## max_mod             -10.5       3.9 
 
 
 # . Run LOO across all imputed datasets -----------------------------------
@@ -413,15 +417,19 @@ loom_cov = parallel::parLapply(cl = clt,
 #takes 10 minutes
 
 path_ic = file.path(dirname(path_mod), paste0(basename(path_mod), 'ic_comb.Rdata'))
-system.time({
-  ic_list = parallel::parLapply(cl = clt,
-                      X = comb_listlist,
-                     fun = add_criterion, 
-                     criterion = 'loo'
-                   )
-})
+if(load_loo & file.exists(path_ic))
+{load(path_ic)}else
+{
+  system.time({
+    ic_list = parallel::parLapply(cl = clt,
+                        X = comb_listlist,
+                       fun = add_criterion, 
+                       criterion = 'loo'
+                     )
+  })
 ## user  system elapsed 
 ## 1.37    1.82  585.05 
+}
 if(save_loo | !file.exists(path_ic))
 {
   save(ic_list, file = path_ic )
@@ -443,7 +451,7 @@ parallel::stopCluster(clt)
 # imputed datasets are very similar, and so model predictive power should vary little
 summary(abs(unlist(loom_cov))) #expect SD <10% of mean
     ## Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-    ## 0.0004901 0.0010619 0.0057453 0.0148961 0.0221784 0.0622748   
+    ## 0.0004985 0.0012219 0.0058122 0.0145130 0.0223747 0.0634567 
 
 # Save the model with lowest LOO information criterion --------------------
 #sort LOO criteria lowest (least information loss) to highest (worst information loss)
@@ -452,7 +460,7 @@ Extract_looic_est = function(x){x[[3]]}
 #before using LOO IC for model selection, check variation across imputed datasets was low
 summary( sapply(X = loom_cov, FUN = Extract_looic_est) )
   ## Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-  ## 0.0005109 0.0006421 0.0008664 0.0009559 0.0009834 0.0020706 
+  ## 0.0004985 0.0006243 0.0007534 0.0009210 0.0012219 0.0018901 
 
 #extract LOO IC for all models
 all_looic = sort( 
@@ -462,54 +470,63 @@ all_looic = sort(
                   )
 print(t(t(all_looic)))
     ## [,1]
-    ## dspeed_mod          476.5723
-    ## dspeed_mu_mod       476.9219
-    ## dspeed_age_mod      478.9725
-    ## dspeed_age_mu_mod   479.3268
-    ## treat_mu_mod        480.1619
-    ## null_mod            480.7124
-    ## treat_mod           480.8620
-    ## age_mod             483.1547
-    ## two_interact_mu_mod 483.7303
-    ## age_mu_mod          484.7352
-    ## max_mu_mod          485.8961
-    ## two_interact_mod    487.5536
-    ## max_mod             491.0355
+    ## dspeed_noint_mod    475.5917
+    ## dspeed_noint_mu_mod 476.3426
+    ## dspeed_mod          476.5738 # close but not necessarily best
+    ## dspeed_mu_mod       476.8401
+    ## dspeed_age_mu_mod   479.4269
+    ## treat_mu_mod        480.2400
+    ## null_mod            480.7008
+    ## treat_mod           480.9978
+    ## dspeed_age_mod      481.8980
+    ## age_noint_mu_mod    482.5941
+    ## two_interact_mu_mod 484.2389
+    ## age_mu_mod          484.5868
+    ## age_noint_mod       486.6616
+    ## max_mu_mod          487.6707
+    ## two_interact_mod    489.9733
+    ## age_mod             491.7143
+    ## max_mod             494.9861
 
 #ELPD
-    ## dspeed_mod          -238.2861
-    ## dspeed_mu_mod       -238.4609
-    ## dspeed_age_mod      -239.4863
-    ## dspeed_age_mu_mod   -239.6634
-    ## treat_mu_mod        -240.0810
-    ## null_mod            -240.3562
-    ## treat_mod           -240.4310
-    ## age_mod             -241.5774
-    ## two_interact_mu_mod -241.8651
-    ## age_mu_mod          -242.3676
-    ## max_mu_mod          -242.9480
-    ## two_interact_mod    -243.7768
-    ## max_mod             -245.5178
+    ## dspeed_noint_mod    -237.7959
+    ## dspeed_noint_mu_mod -238.1713
+    ## dspeed_mod          -238.2869
+    ## dspeed_mu_mod       -238.4201
+    ## dspeed_age_mu_mod   -239.7134
+    ## treat_mu_mod        -240.1200
+    ## null_mod            -240.3504
+    ## treat_mod           -240.4989
+    ## dspeed_age_mod      -240.9490
+    ## age_noint_mu_mod    -241.2971
+    ## two_interact_mu_mod -242.1194
+    ## age_mu_mod          -242.2934
+    ## age_noint_mod       -243.3308
+    ## max_mu_mod          -243.8354
+    ## two_interact_mod    -244.9866
+    ## age_mod             -245.8571
+    ## max_mod             -247.4931
 
 #select the model with the lowest LOO information criterion
-best_model_name = names(all_looic)[[1]] # this will be first in the sorted list
+# best_model_name = names(all_looic)[[1]] # this will be first in the sorted list
+best_model_name = names(all_looic)[[3]] # choose a plausible alternative within 1.0 LOO IC of the top
 #find the combined model and the list it was combined from
-best_model = comb_listlist[[best_model_name]]
+best_model = ic_list[[best_model_name]]
 best_model_list = model_listlist[[best_model_name]]
 #inspect this model
 summary(best_model)
     ## Population-Level Effects: 
     ##   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-    ## Intercept                 0.11      0.11    -0.11     0.33 1.00   170308   151175
-    ## Treatment2               -0.21      0.15    -0.49     0.08 1.00   183309   155883
-    ## Dspeed                    0.27      0.10     0.08     0.47 1.00   183486   154427
-    ## Treatment2:Dspeed        -0.24      0.15    -0.54     0.06 1.00   180627   152465
-    ## phi_Intercept             1.31      0.17     0.97     1.64 1.00   169948   148710
-    ## phi_Treatment2           -0.16      0.25    -0.65     0.32 1.00   162594   153908
-    ## phi_Dspeed               -0.10      0.15    -0.40     0.17 1.00   183094   149112
-    ## phi_Treatment2:Dspeed    -0.29      0.25    -0.77     0.19 1.00   177658   155249
+    ## Intercept                 0.11      0.11    -0.11     0.33 1.00   175179   152284
+    ## Treatment2               -0.21      0.15    -0.50     0.08 1.00   187324   157599
+    ## Dspeed                    0.27      0.10     0.08     0.47 1.00   178243   149211
+    ## Treatment2:Dspeed        -0.24      0.15    -0.54     0.06 1.00   176612   153665
+    ## phi_Intercept             1.31      0.17     0.97     1.64 1.00   170479   144734
+    ## phi_Treatment2           -0.16      0.25    -0.65     0.32 1.00   164594   151741
+    ## phi_Dspeed               -0.10      0.15    -0.40     0.17 1.00   180842   147497
+    ## phi_Treatment2:Dspeed    -0.29      0.25    -0.78     0.20 1.00   172910   151482
 
-#save each of these with a recognisible name
+#save each of these with a recognisable name
 save(best_model,
      file = file.path(dirname(path_mod), 'best_model.Rdata') )
 save(best_model_list,
@@ -523,23 +540,23 @@ save(best_model_list,
 #chosen model
 # loom_agg$dspeed_mod
   ##           Estimate  SE      
-  ## elpd_loo -238.2861 7.471583
-  ## p_loo    10.27591  2.11375 
-  ## looic    476.5723  14.94317
+  ## elpd_loo -238.2869 7.465569
+  ## p_loo    10.2671   2.108434
+  ## looic    476.5738  14.93114
 #model with no effects, only a mean
 # loom_agg$null_mod
   ##           Estimate  SE      
-  ## elpd_loo -240.3562 7.364742
-  ## p_loo    4.773523  1.344434
-  ## looic    480.7124  14.72948
+  ## elpd_loo -240.3504 7.363579
+  ## p_loo    4.780897  1.344213
+  ## looic    480.7008  14.72716
 best_null_comp = with(loom_agg, 
                       AggList(lst = list(null_mod,  dspeed_mod) , 
                               fn = diff ) 
                       )
   ##           Estimate SE       
-  ## elpd_loo 2.070055 0.1068408 # higher likelihood
-  ## p_loo    5.502391 0.7693163
-  ## looic    -4.14011 0.2136816 # lower information criterion
+  ## elpd_loo 2.063503  0.1019896 # higher likelihood
+  ## p_loo    5.486199  0.7642216
+  ## looic    -4.127007 0.2039792 # lower information criterion
 #compare combined models
 with(ic_list,
      loo_compare(null_mod,
@@ -548,25 +565,25 @@ with(ic_list,
      )
 ##           elpd_diff se_diff
 ## dspeed_mod  0.0       0.0   
-## null_mod   -1.9       4.6 #lower likelihood
+## null_mod   -2.0       4.6  #lower predictive power
 
 # . Is the effect of Dspeed important? ------------------------------------
 
 #model without effect of dspeed
 # loom_agg$treat_mod
   ##           Estimate SE      
-  ## elpd_loo -240.431 7.068704
-  ## p_loo    6.792667 1.762702
-  ## looic    480.862  14.13741
+  ## elpd_loo -240.4989 7.074703
+  ## p_loo    6.873587  1.799166
+  ## looic    480.9978  14.14941
 dspeedtreat_comp = with(loom_agg, 
                       AggList(lst = list(treat_mod, #compare with treatment only 
                                          dspeed_mod) , #best model as reference
                               fn = diff ) 
                       )
   ##           Estimate  SE       
-  ## elpd_loo 2.144831  0.4028792 # higher likelihood
-  ## p_loo    3.483246  0.3510476
-  ## looic    -4.289663 0.8057584 # lower information criterion
+  ## elpd_loo 2.211989  0.3908662 # higher likelihood
+  ## p_loo    3.393509  0.3092684
+  ## looic    -4.423978 0.7817323 # lower information criterion
 
 #compare combined models
 with(ic_list,
@@ -576,7 +593,7 @@ with(ic_list,
 )
 ##           elpd_diff se_diff
 ## dspeed_mod  0.0       0.0   
-## treat_mod  -2.0       3.7  #lower likelihood
+## treat_mod  -2.1       3.6  #lower likelihood
 
 # . Is the interaction of Dspeed & Treatment important? -------------------
 
@@ -584,18 +601,18 @@ with(ic_list,
 #model without effect of dspeed
 # loom_agg$treat_mod
 ##           Estimate SE      
-## elpd_loo -240.431 7.068704
-## p_loo    6.792667 1.762702
-## looic    480.862  14.13741
+## elpd_loo -240.4989 7.074703
+## p_loo    6.873587  1.799166
+## looic    480.9978  14.14941
 dspeedint_comp = with(loom_agg, 
                         AggList(lst = list(dspeed_noint_mod, #compare with treatment only 
                                            dspeed_mod) , #best model as reference
                                 fn = diff ) 
 )
 ##           Estimate  SE       
-## elpd_loo -0.4637195 0.1364418 # slightly lower likelihood, not great for our conclusions
-## p_loo    1.991507   0.2034555
-## looic    0.9274389  0.2728837 # slightly higher information criterion
+## elpd_loo -0.4910217 0.1411176 # slightly lower likelihood, not great for our conclusions
+## p_loo    2.015117   0.1852424
+## looic    0.9820434  0.2822352 # slightly higher information criterion
 
 #compare combined models
 with(ic_list,
@@ -613,9 +630,9 @@ with(ic_list,
 #model with effects of age, dspeed & treatment and their 2-way interactions
 # loom_agg$two_interact_mod
   ##           Estimate  SE      
-  ## elpd_loo -243.7768 7.822255
-  ## p_loo    17.41609  3.63594 
-  ## looic    487.5536  15.64451
+  ## elpd_loo -244.9866 8.203791
+  ## p_loo    17.89855  3.753048
+  ## looic    17.89855  3.753048
 
 twoway_comp = with(loom_agg, 
                         AggList(lst = list(two_interact_mod, #compare with two way interactions
@@ -623,9 +640,9 @@ twoway_comp = with(loom_agg,
                                 fn = diff ) 
 )
   ##           Estimate  SE      
-  ## elpd_loo 5.490666  -0.3506721 # much higher likelihood
-  ## p_loo    -7.140181 -1.52219  
-  ## looic    -10.98133 -0.7013442 # much lower information criterion
+  ## elpd_loo 6.699739  -0.7382225 # much higher likelihood
+  ## p_loo    -7.631455 -1.644613  
+  ## looic    -13.39948 -1.476445 # much lower information criterion
 #compare combined models
 with(ic_list,
      loo_compare(two_interact_mod,
@@ -634,14 +651,14 @@ with(ic_list,
 )
 ##                  elpd_diff se_diff
 ## dspeed_mod        0.0       0.0   
-## two_interact_mod -6.1       2.3   
+## two_interact_mod -7.4       2.6  
 
 #model with effects of age, treatment and their interaction (no dspeed)
 # loom_agg$age_mod
   ##           Estimate  SE      
-  ## elpd_loo -241.5774 7.173215
-  ## p_loo    10.01907  2.010302
-  ## looic    483.1547  14.34643
+  ## elpd_loo -245.8571 7.579079
+  ## p_loo    12.67885  3.751872
+  ## looic    491.7143  15.15816
 
 age_comp = with(loom_agg, 
                    AggList(lst = list(treat_mod, #compare with treatment only 
@@ -649,9 +666,9 @@ age_comp = with(loom_agg,
                            fn = diff ) 
 )
   ##           Estimate  SE       
-  ## elpd_loo -1.146382 0.1045111 # lower likelihood than treatment alone
-  ## p_loo    3.226399  0.2476003
-  ## looic    2.292765  0.2090222 # higher information criterion than treatment alone
+  ## elpd_loo -5.358263 0.504376 # lower likelihood than treatment alone
+  ## p_loo    5.805264  1.952706
+  ## looic    10.71653  1.008752 # higher information criterion than treatment alone
 #compare combined models
 with(ic_list,
      loo_compare(treat_mod,
@@ -660,5 +677,5 @@ with(ic_list,
 )
 ##            elpd_diff se_diff
 ## treat_mod  0.0       0.0   
-## age_mod   -1.1       1.8   
+## age_mod   -5.7       1.8   
 
